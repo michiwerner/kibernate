@@ -1,8 +1,8 @@
 name: Kibernate Helm
 on:
-  push:
-    paths:
-      - 'deployments/helm/**'
+  - push
+#    paths:
+#      - 'deployments/helm/**'
 jobs:
   test:
     runs-on: ubuntu-latest
