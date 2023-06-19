@@ -4,16 +4,13 @@ deploy-testtarget:
 install-helm-chart:
 	./scripts/install-helm-chart.sh
 
-prepare-helm-chart:
-	./scripts/prepare-helm-chart.sh
-
 prepare-testing-env:
 	./scripts/prepare-testing-env.sh
 
 tear-down-testing-env:
 	./scripts/tear-down-testing-env.sh
 
-test-all: prepare-testing-env prepare-helm-chart docker-build \
+test-all: prepare-testing-env docker-build \
 	01-test-http-passthrough \
 	02-test-http-activation \
 	03-test-companion-deployment-activation \
@@ -25,12 +22,12 @@ docker-build:
 	./scripts/docker-build.sh
 
 lint-kibernate:
-	cd deployments/helm
+	cd deployments/helm/kibernate
 	helm lint --strict .
 
 package-kibernate:
 	cd deployments/helm
-	helm package .
+	helm package kibernate
 
 docker-buildx-push-ghcr:
 ifndef IMAGE_TAGS
