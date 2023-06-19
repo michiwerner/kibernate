@@ -4,7 +4,7 @@ set -eo pipefail
 
 cd "$(dirname "$0")"/..
 
-docker build -f Dockerfile -t kibernate:latest .
+docker build -f package/docker/Dockerfile -t kibernate:latest .
 
 if [[ -n "$(command -v minikube)" ]] && minikube profile list | grep kibernate-test; then
   echo "minikube profile kibernate-test exists - importing image into minikube"
