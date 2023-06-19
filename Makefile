@@ -25,7 +25,7 @@ helm-lint:
 	helm lint --strict ./deployments/helm/kibernate-chart
 
 helm-package:
-	helm package ./deployments/helm/kibernate-chart
+	helm package -d ./deployments/helm ./deployments/helm/kibernate-chart
 
 helm-publish:
 	helm push ./deployments/helm/kibernate-chart-*.tgz oci://ghcr.io/michiwerner
