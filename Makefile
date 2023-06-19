@@ -21,13 +21,13 @@ test-all: prepare-testing-env docker-build \
 docker-build:
 	./scripts/docker-build.sh
 
-lint-kibernate:
-	cd deployments/helm/kibernate
+helm-lint:
+	cd deployments/helm/kibernate-chart
 	helm lint --strict .
 
-package-kibernate:
+helm-package:
 	cd deployments/helm
-	helm package kibernate
+	helm package kibernate-chart
 
 docker-buildx-push-ghcr:
 ifndef IMAGE_TAGS
