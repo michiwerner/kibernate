@@ -1,0 +1,22 @@
+kibernate:
+  version: 0
+  link:
+    type: http
+    listenPort: 8080
+    servicePort: 8080
+    serviceName: testtarget
+  middlewares:
+    - type: activity
+      default: include
+  extensions:
+    - type: companionDeployment
+      namespace: default
+      deployment: testtarget-companion1
+    - type: companionDeployment
+      namespace: default
+      deployment: testtarget-companion2
+  controller:
+    type: deployment
+    namespace: default
+    deployment: testtarget
+    idleTimeout: 00:00:10

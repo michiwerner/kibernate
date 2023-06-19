@@ -1,0 +1,16 @@
+name: Kibernate Helm
+on:
+  push:
+    paths:
+      - 'deployments/helm/**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: helm lint
+        run: helm lint deployments/helm/kibernate
+  
+    
