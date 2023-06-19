@@ -15,7 +15,7 @@ jobs:
       - name: helm package
         run: make helm-package
       - name: helm login
-        run: echo {{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io/michiwerner --username {{ github.actor }} --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io/michiwerner --username "${{ github.actor }}" --password-stdin
       - name: helm publish
         run: make helm-publish
   
