@@ -12,13 +12,11 @@ jobs:
         uses: actions/checkout@v3
       - name: helm lint
         run: make helm-lint
-      - name: Push Helm chart to GHCR
-        uses: bsord/helm-push@4.1.0
-        with:
-          useOCIRegistry: true
-          registry-url: oci://ghcr.io/michiwerner
-          username: ${{ github.actor }}
-          access-token: ${{ secrets.GITHUB_TOKEN }}
-          chart-folder: deployments/helm/kibernate-chart
+      - name: helm package
+        run: make helm-package
+      - name: helm login
+        run: echo {{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io/michiwerner --username {{ github.actor }} --password-stdin
+      - name: helm publish
+        run: make helm-publish
   
     

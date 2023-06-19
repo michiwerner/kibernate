@@ -29,6 +29,10 @@ helm-package:
 	cd deployments/helm
 	helm package kibernate-chart
 
+helm-publish:
+	cd deployments/helm
+	helm push kibernate-chart-*.tgz oci://ghcr.io/michiwerner
+
 docker-buildx-push-ghcr:
 ifndef IMAGE_TAGS
 	$(error IMAGE_TAGS is undefined)
