@@ -22,16 +22,13 @@ docker-build:
 	./scripts/docker-build.sh
 
 helm-lint:
-	cd deployments/helm/kibernate-chart
-	helm lint --strict .
+	helm lint --strict ./deployments/helm/kibernate-chart
 
 helm-package:
-	cd deployments/helm
-	helm package kibernate-chart
+	helm package ./deployments/helm/kibernate-chart
 
 helm-publish:
-	cd deployments/helm
-	helm push kibernate-chart-*.tgz oci://ghcr.io/michiwerner
+	helm push ./deployments/helm/kibernate-chart-*.tgz oci://ghcr.io/michiwerner
 
 docker-buildx-push-ghcr:
 ifndef IMAGE_TAGS
