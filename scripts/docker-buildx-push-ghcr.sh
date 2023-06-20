@@ -15,7 +15,7 @@ done
 
 #docker buildx build --platform linux/amd64 $tags --push -f Dockerfile .
 
-docker build $tags -f Dockerfile .
+docker build $tags -f package/docker/Dockerfile .
 
 for tag in "$@"; do
   docker push "ghcr.io/michiwerner/kibernate:$tag"
