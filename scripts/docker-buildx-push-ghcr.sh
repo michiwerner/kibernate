@@ -10,7 +10,7 @@ fi
 cd "$(dirname "$0")"/..
 
 for tag in "$@"; do
-  tags="$tags -t ghcr.io/kibernate/kibernate:$tag"
+  tags="$tags -t ghcr.io/michiwerner/kibernate:$tag"
 done
 
 #docker buildx build --platform linux/amd64 $tags --push -f Dockerfile .
@@ -18,5 +18,5 @@ done
 docker build $tags -f Dockerfile .
 
 for tag in "$@"; do
-  docker push "ghcr.io/kibernate/kibernate:$tag"
+  docker push "ghcr.io/michiwerner/kibernate:$tag"
 done
