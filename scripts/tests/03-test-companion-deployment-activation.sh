@@ -16,9 +16,9 @@ function finally() {
 }
 trap finally EXIT
 
-kubectl create deployment testtarget --image=ghcr.io/nginxinc/nginx-unprivileged:1.23-alpine --replicas=0 --port=8080
-kubectl create deployment testtarget-companion1 --image=ghcr.io/nginxinc/nginx-unprivileged:1.23-alpine --replicas=0 --port=8080
-kubectl create deployment testtarget-companion2 --image=ghcr.io/nginxinc/nginx-unprivileged:1.23-alpine --replicas=0 --port=8080
+kubectl create deployment testtarget --image=nginxinc/nginx-unprivileged:latest --replicas=0 --port=8080
+kubectl create deployment testtarget-companion1 --image=nginxinc/nginx-unprivileged:latest --replicas=0 --port=8080
+kubectl create deployment testtarget-companion2 --image=nginxinc/nginx-unprivileged:latest --replicas=0 --port=8080
 kubectl expose deployment testtarget --port=8080 --target-port=8080
 kubectl expose deployment testtarget-companion1 --port=8080 --target-port=8080
 kubectl expose deployment testtarget-companion2 --port=8080 --target-port=8080
