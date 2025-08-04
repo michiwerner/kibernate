@@ -11,7 +11,7 @@ function finally() {
 }
 trap finally EXIT
 
-kubectl create deployment testtarget --image=ghcr.io/nginxinc/nginx-unprivileged:1.23-alpine --replicas=1 --port=8080
+kubectl create deployment testtarget --image=nginxinc/nginx-unprivileged:latest --replicas=1 --port=8080
 kubectl expose deployment testtarget --port=8080 --target-port=8080
 ./scripts/install-helm-chart.sh -f ./configs/tests/helm/04-test-http-deactivation.yml
 kubectl wait --for=condition=available --timeout=60s deployment/kibernate
