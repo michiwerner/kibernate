@@ -7,7 +7,6 @@ cd "$(dirname "$0")"/../../
 function finally() {
   set +eo pipefail
   kubectl delete deployment testtarget1 testtarget2 testtarget3 2>/dev/null || true
-  kubectl delete service testtarget1 testtarget2 testtarget3 2>/dev/null || true
   kubectl delete service kibernate-instance1 kibernate-instance2 kibernate-instance3 2>/dev/null || true
 }
 trap finally EXIT
@@ -45,9 +44,9 @@ kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget3
 
 # Create services for each Kibernate instance port
 echo "Creating services for Kibernate instances..."
-kubectl expose deployment kibernate --name=kibernate-instance1 --port=8080 --target-port=8080 || true
-kubectl expose deployment kibernate --name=kibernate-instance2 --port=8081 --target-port=8081 || true
-kubectl expose deployment kibernate --name=kibernate-instance3 --port=8082 --target-port=8082 || true
+# kubectl expose deployment kibernate --name=kibernate-instance1 --port=8080 --target-port=8080 || true
+# kubectl expose deployment kibernate --name=kibernate-instance2 --port=8081 --target-port=8081 || true
+# kubectl expose deployment kibernate --name=kibernate-instance3 --port=8082 --target-port=8082 || true
 
 # Wait for all services to be ready with endpoints
 echo "Waiting for service endpoints to be ready..."

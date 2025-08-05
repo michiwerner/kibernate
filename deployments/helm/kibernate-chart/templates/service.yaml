@@ -7,9 +7,18 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
+    {{- if .Values.kibernate.instances }}
+    {{- range .Values.kibernate.instances }}
+    - port: {{ .link.listenPort }}
+      targetPort: {{ .link.listenPort }}
+      protocol: TCP
+      name: {{ .name }}
+    {{- end }}
+    {{- else }}
     - port: {{ .Values.service.port }}
       targetPort: http
       protocol: TCP
       name: http
+    {{- end }}
   selector:
     {{- include "kibernate.selectorLabels" . | nindent 4 }}
