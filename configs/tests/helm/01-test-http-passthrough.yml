@@ -1,14 +1,16 @@
 kibernate:
   version: 0
-  link:
-    type: http
-    listenPort: 8080
-    servicePort: 8080
-    serviceName: testtarget
-  middlewares: []
-  extensions: []
-  controller:
-    type: deployment
-    namespace: default
-    deployment: testtarget
-    idleTimeout: 01:00:00
+  instances:
+    - name: default
+      link:
+        type: http
+        listenPort: 8080
+        servicePort: 8080
+        serviceName: testtarget
+      middlewares: []
+      extensions: []
+      controller:
+        type: deployment
+        namespace: default
+        deployment: testtarget
+        idleTimeout: 01:00:00

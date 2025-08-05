@@ -35,19 +35,9 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            {{- if .Values.kibernate.instances }}
             {{- range .Values.kibernate.instances }}
             - name: {{ .name }}
               containerPort: {{ .link.listenPort }}
-              protocol: TCP
-            {{- end }}
-            {{- else if .Values.kibernate.link }}
-            - name: http
-              containerPort: {{ .Values.kibernate.link.listenPort | default .Values.service.port }}
-              protocol: TCP
-            {{- else }}
-            - name: http
-              containerPort: {{ .Values.service.port }}
               protocol: TCP
             {{- end }}
           resources:
