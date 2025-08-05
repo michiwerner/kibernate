@@ -85,6 +85,12 @@ kubectl get pods -l app=testtarget3
 echo "Debug: Testing direct connection to testtarget1..."
 kubectl run -i --rm debug-test --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "curl -v --connect-timeout 5 --max-time 10 'http://testtarget1:8080' 2>&1" || echo "Direct testtarget1 test failed"
 
+# Debug: Check what ports Kibernate is actually listening on
+echo "Debug: Checking Kibernate pod ports..."
+kibernate_pod=$(kubectl get pods -l app.kubernetes.io/name=kibernate -o name | head -1)
+echo "Kibernate pod: $kibernate_pod"
+kubectl exec $kibernate_pod -- /bin/sh -c "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null || echo 'No netstat/ss available'" || echo "Failed to check ports"
+
 # Test instance 1 (port 8080)
 echo "Testing instance 1 on port 8080..."
 kubectl run -i --rm test1 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
@@ -143,14 +149,29 @@ exit 1
 # Test instance 2 (port 8081)
 echo "Testing instance 2 on port 8081..."
 kubectl run -i --rm test2 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
-set -eo pipefail
+set +eo pipefail  # Disable exit on error to capture all debug info
 sleep 5
 
-# Test that Kibernate responds on port 8081 with proper HTTP status capture
-curl -s -w \"HTTP_STATUS:%{http_code}\" --connect-timeout 10 --max-time 30 'http://kibernate-instance2:8081' > /tmp/curl_out.txt 2>&1
+# Debug: Try to resolve the service
+echo \"Debug: Trying to resolve kibernate-instance2\"
+nslookup kibernate-instance2 || echo \"DNS resolution failed\"
 
-# Extract HTTP status
-http_status=\$(grep -o \"HTTP_STATUS:[0-9]*\" /tmp/curl_out.txt | cut -d: -f2)
+# Debug: Test basic connectivity
+echo \"Debug: Testing basic connectivity to service\"
+nc -zv kibernate-instance2 8081 || echo \"Port connection test failed\"
+
+# Test that Kibernate responds on port 8081 with proper HTTP status capture
+echo \"Debug: Attempting curl connection...\"
+curl -v -w \"HTTP_STATUS:%{http_code}\" --connect-timeout 10 --max-time 30 'http://kibernate-instance2:8081' > /tmp/curl_out.txt 2>&1
+curl_exit_code=\$?
+echo \"Curl exit code: \$curl_exit_code\"
+
+# Show full output for debugging
+echo \"Full curl output:\"
+cat /tmp/curl_out.txt
+
+# Extract HTTP status if present
+http_status=\$(grep -o \"HTTP_STATUS:[0-9]*\" /tmp/curl_out.txt | cut -d: -f2 || echo \"NO_STATUS\")
 
 echo \"Instance 2 HTTP Status: \$http_status\"
 
@@ -158,10 +179,12 @@ if [ \"\$http_status\" = \"200\" ] || [ \"\$http_status\" = \"502\" ]; then
   echo \"Instance 2 connection successful - multi-instance working on port 8081!\"
   echo \"Got HTTP \$http_status from Kibernate on port 8081\"
   exit 0
+elif [ \$curl_exit_code -eq 7 ]; then
+  echo \"Connection refused - Kibernate may not be listening on port 8081\"
+  echo \"This could indicate the multi-instance configuration isn't working properly\"
+  exit 1
 else
   echo \"Instance 2 unexpected status: \$http_status\"
-  echo \"Response:\"
-  cat /tmp/curl_out.txt
   exit 1
 fi
 "
