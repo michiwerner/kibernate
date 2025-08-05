@@ -16,6 +16,8 @@ test-all: prepare-testing-env docker-build \
 	03-test-companion-deployment-activation \
 	04-test-http-deactivation \
 	05-test-companion-deployment-deactivation \
+	06-test-multi-instance \
+	07-test-backward-compatibility \
 	tear-down-testing-env
 
 docker-build:
@@ -50,3 +52,9 @@ endif
 	
 05-test-companion-deployment-deactivation:
 	./scripts/tests/05-test-companion-deployment-deactivation.sh
+
+06-test-multi-instance:
+	./scripts/tests/06-test-multi-instance.sh
+
+07-test-backward-compatibility:
+	./scripts/tests/07-test-backward-compatibility.sh
