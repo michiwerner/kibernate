@@ -23,7 +23,7 @@ namespace Kibernate;
 
 public class KibernateEngine : IRunnable
 {
-    private Config _config;
+    private InstanceConfig _config;
     
     private ILogger _logger;
 
@@ -35,7 +35,7 @@ public class KibernateEngine : IRunnable
     
     private Extensions.ExtensionCollection _extensions = new();
 
-    public KibernateEngine(Config config, ILogger logger)
+    public KibernateEngine(InstanceConfig config, ILogger logger)
     {
         _config = config;
         _logger = logger;

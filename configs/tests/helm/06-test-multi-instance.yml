@@ -1,0 +1,46 @@
+version: 0
+instances:
+  - name: instance1
+    link:
+      type: http
+      listenPort: 8080
+      servicePort: 8080
+      serviceName: testtarget1
+    middlewares:
+      - type: noneWaiter
+    extensions: []
+    controller:
+      type: deployment
+      namespace: default
+      deployment: testtarget1
+      idleTimeout: 01:00:00
+      
+  - name: instance2
+    link:
+      type: http
+      listenPort: 8081
+      servicePort: 8080
+      serviceName: testtarget2
+    middlewares:
+      - type: activity
+    extensions: []
+    controller:
+      type: deployment
+      namespace: default
+      deployment: testtarget2
+      idleTimeout: 01:00:00
+      
+  - name: instance3
+    link:
+      type: http
+      listenPort: 8082
+      servicePort: 8080
+      serviceName: testtarget3
+    middlewares:
+      - type: noneWaiter
+    extensions: []
+    controller:
+      type: deployment
+      namespace: default
+      deployment: testtarget3
+      idleTimeout: 01:00:00

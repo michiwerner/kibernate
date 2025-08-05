@@ -18,6 +18,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Kibernate;
@@ -26,11 +28,26 @@ public class Program
 {
     public static async Task Main()
     {
-        var logger = LoggerFactory.Create(builder => {
-        builder.AddConsole();
-        }).CreateLogger<Program>();    
+        var loggerFactory = LoggerFactory.Create(builder => {
+            builder.AddConsole();
+        });
+        var logger = loggerFactory.CreateLogger<Program>();
+        
         var config = Config.CreateFromFile("/etc/kibernate/kibernate.yml");
-        var kibernate = new KibernateEngine(config, logger);
-        await kibernate.RunAsync();
+        
+        logger.LogInformation($"Starting {config.Instances.Count} Kibernate instance(s)");
+        
+        var engines = new List<KibernateEngine>();
+        foreach (var instanceConfig in config.Instances)
+        {
+            var instanceLogger = loggerFactory.CreateLogger($"KibernateEngine[{instanceConfig.Name}]");
+            logger.LogInformation($"Creating Kibernate instance: {instanceConfig.Name}");
+            var engine = new KibernateEngine(instanceConfig, instanceLogger);
+            engines.Add(engine);
+        }
+        
+        // Run all engines in parallel
+        var tasks = engines.Select(engine => engine.RunAsync()).ToArray();
+        await Task.WhenAll(tasks);
     }
 }

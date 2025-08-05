@@ -1,0 +1,52 @@
+version: 0
+instances:
+  - name: web-app
+    link:
+      type: http
+      listenPort: 8080
+      servicePort: 8080
+      serviceName: webapp
+    middlewares:
+      - type: activity
+      - type: connectWaiter
+    extensions: []
+    controller:
+      type: deployment
+      namespace: default
+      deployment: webapp
+      idleTimeout: 01:00:00
+      
+  - name: api-service
+    link:
+      type: http
+      listenPort: 8081
+      servicePort: 8080
+      serviceName: api
+    middlewares:
+      - type: activity
+      - type: loadingWaiter
+    extensions:
+      - type: readinessCheck
+        path: /health
+    controller:
+      type: deployment
+      namespace: default
+      deployment: api
+      idleTimeout: 00:30:00
+      
+  - name: background-worker
+    link:
+      type: http
+      listenPort: 8082
+      servicePort: 8080
+      serviceName: worker
+    middlewares:
+      - type: noneWaiter
+    extensions:
+      - type: scheduledAlwaysOn
+        schedule: "0 9-17 * * 1-5"  # 9 AM to 5 PM on weekdays
+    controller:
+      type: deployment
+      namespace: default
+      deployment: worker
+      idleTimeout: 00:15:00

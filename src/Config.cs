@@ -24,7 +24,60 @@ namespace Kibernate;
 
 public class ComponentConfig : Dictionary<string, string>  {}
 
+public class InstanceConfig
+{
+    public string Name { get; set; }
+
+    public ComponentConfig Link { get; set; }
+
+    public List<ComponentConfig> Middlewares { get; set; }
+    
+    public List<ComponentConfig> Extensions { get; set; }
+
+    public ComponentConfig Controller { get; set; }
+}
+
 public class Config
+{
+    public string Version { get; set; }
+
+    public List<InstanceConfig> Instances { get; set; }
+    
+    public static Config CreateFromFile(string path)
+    {
+        var deserializer = new DeserializerBuilder().WithNamingConvention(UnderscoredNamingConvention.Instance).Build();
+        var yamlContent = File.ReadAllText(path);
+        
+        // Check if the config is in the old format (single instance)
+        if (yamlContent.Contains("link:") && !yamlContent.Contains("instances:"))
+        {
+            // Parse as old format and convert to new format
+            var oldConfig = deserializer.Deserialize<OldConfig>(yamlContent);
+            return new Config
+            {
+                Version = oldConfig.Version,
+                Instances = new List<InstanceConfig>
+                {
+                    new InstanceConfig
+                    {
+                        Name = "default",
+                        Link = oldConfig.Link,
+                        Middlewares = oldConfig.Middlewares,
+                        Extensions = oldConfig.Extensions,
+                        Controller = oldConfig.Controller
+                    }
+                }
+            };
+        }
+        
+        // Parse as new format
+        var config = deserializer.Deserialize<Config>(yamlContent);
+        return config;
+    }
+}
+
+// Keep the old config structure for backward compatibility
+internal class OldConfig
 {
     public string Version { get; set; }
 
@@ -35,11 +88,4 @@ public class Config
     public List<ComponentConfig> Extensions { get; set; }
 
     public ComponentConfig Controller { get; set; }
-    
-    public static Config CreateFromFile(string path)
-    {
-        var deserializer = new DeserializerBuilder().WithNamingConvention(UnderscoredNamingConvention.Instance).Build();
-        var config = deserializer.Deserialize<Config>(File.ReadAllText(path));
-        return config;
-    }
 }
