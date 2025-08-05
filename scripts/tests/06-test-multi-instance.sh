@@ -145,12 +145,23 @@ echo "Testing instance 2 on port 8081..."
 kubectl run -i --rm test2 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
-# Test that Kibernate responds on port 8081 (different from port 8080)
-if curl -v --connect-timeout 10 --max-time 30 'http://kibernate-instance2:8081' 2>&1 | grep -q 'Connected to kibernate-instance2'; then
+
+# Test that Kibernate responds on port 8081 with proper HTTP status capture
+curl -s -w \"HTTP_STATUS:%{http_code}\" --connect-timeout 10 --max-time 30 'http://kibernate-instance2:8081' > /tmp/curl_out.txt 2>&1
+
+# Extract HTTP status
+http_status=\$(grep -o \"HTTP_STATUS:[0-9]*\" /tmp/curl_out.txt | cut -d: -f2)
+
+echo \"Instance 2 HTTP Status: \$http_status\"
+
+if [ \"\$http_status\" = \"200\" ] || [ \"\$http_status\" = \"502\" ]; then
   echo \"Instance 2 connection successful - multi-instance working on port 8081!\"
+  echo \"Got HTTP \$http_status from Kibernate on port 8081\"
   exit 0
 else
-  echo \"Instance 2 connection failed\"
+  echo \"Instance 2 unexpected status: \$http_status\"
+  echo \"Response:\"
+  cat /tmp/curl_out.txt
   exit 1
 fi
 "
@@ -160,12 +171,23 @@ echo "Testing instance 3 on port 8082..."
 kubectl run -i --rm test3 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
-# Test that Kibernate responds on port 8082 (different from ports 8080 and 8081)
-if curl -v --connect-timeout 10 --max-time 30 'http://kibernate-instance3:8082' 2>&1 | grep -q 'Connected to kibernate-instance3'; then
+
+# Test that Kibernate responds on port 8082 with proper HTTP status capture
+curl -s -w \"HTTP_STATUS:%{http_code}\" --connect-timeout 10 --max-time 30 'http://kibernate-instance3:8082' > /tmp/curl_out.txt 2>&1
+
+# Extract HTTP status
+http_status=\$(grep -o \"HTTP_STATUS:[0-9]*\" /tmp/curl_out.txt | cut -d: -f2)
+
+echo \"Instance 3 HTTP Status: \$http_status\"
+
+if [ \"\$http_status\" = \"200\" ] || [ \"\$http_status\" = \"502\" ]; then
   echo \"Instance 3 connection successful - multi-instance working on port 8082!\"
+  echo \"Got HTTP \$http_status from Kibernate on port 8082\"
   exit 0
 else
-  echo \"Instance 3 connection failed\"
+  echo \"Instance 3 unexpected status: \$http_status\"
+  echo \"Response:\"
+  cat /tmp/curl_out.txt
   exit 1
 fi
 "
