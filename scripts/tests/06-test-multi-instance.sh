@@ -28,7 +28,7 @@ kubectl expose deployment testtarget3 --port=8080 --target-port=8080
 
 # Install Kibernate with multi-instance config
 echo "Installing Kibernate with multi-instance configuration..."
-./scripts/install-helm-chart.sh -f ./configs/tests/helm/06-test-multi-instance.yml
+./scripts/install-helm-chart.sh -f ./configs/tests/helm/06-test-multi-instance-values.yml
 
 # Wait for all deployments to be ready
 echo "Waiting for deployments to be ready..."
@@ -45,7 +45,13 @@ kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget3
 
 # Wait for kibernate service to be ready
 echo "Waiting for kibernate service endpoints to be ready..."
-kubectl wait --for=condition=ready --timeout=60s endpoints/kibernate
+kubectl wait --for=condition=ready --timeout=60s endpoints/kibernate || {
+  echo "Kibernate endpoints not ready, checking what's wrong..."
+  kubectl get endpoints kibernate
+  kubectl get pods -l app.kubernetes.io/name=kibernate
+  kubectl describe service kibernate
+  exit 1
+}
 
 # Test instance 1 (port 8080)
 echo "Testing instance 1 on port 8080..."
