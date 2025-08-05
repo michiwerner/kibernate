@@ -50,6 +50,10 @@ kubectl wait --for=condition=ready --timeout=60s endpoints/kibernate || {
   kubectl get endpoints kibernate
   kubectl get pods -l app.kubernetes.io/name=kibernate
   kubectl describe service kibernate
+  echo "Kibernate pod logs:"
+  kubectl logs -l app.kubernetes.io/name=kibernate --tail=50
+  echo "Kibernate pod description:"
+  kubectl describe pod -l app.kubernetes.io/name=kibernate
   exit 1
 }
 
