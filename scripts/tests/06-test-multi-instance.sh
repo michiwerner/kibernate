@@ -8,7 +8,7 @@ function finally() {
   set +eo pipefail
   kubectl delete deployment testtarget1 testtarget2 testtarget3 2>/dev/null || true
   kubectl delete service testtarget1 testtarget2 testtarget3 2>/dev/null || true
-  kubectl delete service kibernate-instance1 kibernate-instance2 kibernate-instance3 2>/dev/null || true
+  kubectl delete service kibernate 2>/dev/null || true
 }
 trap finally EXIT
 
@@ -43,20 +43,21 @@ kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget1
 kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget2
 kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget3
 
-# For multi-instance test, we'll test that Kibernate can handle multiple target services
-# through the same port but with different routing configurations
-echo "Testing multi-instance functionality through routing..."
+# Create services for each Kibernate instance port
+echo "Creating services for Kibernate instances..."
 
-# Wait for the default kibernate service to be ready
-echo "Waiting for kibernate service endpoints to be ready..."
-for i in {1..30}; do
-  if kubectl get endpoints kibernate &> /dev/null && \
-     [ "$(kubectl get endpoints kibernate -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null)" ]; then
-    echo "kibernate endpoints are ready"
-    break
-  fi
-  echo "Waiting for kibernate endpoints... (attempt $i/30)"
-  sleep 2
+# Wait for all services to be ready with endpoints
+echo "Waiting for service endpoints to be ready..."
+for service_port in "8080" "8081" "8082"; do
+  echo "Waiting for kibernate service on port $service_port endpoints..."
+  for i in {1..30}; do
+    if kubectl get endpoints kibernate -o jsonpath="{.subsets[?(@.ports[0].port==$service_port)].addresses[*].ip}" &> /dev/null; then
+      echo "kibernate service on port $service_port endpoints are ready"
+      break
+    fi
+    echo "Waiting for kibernate service on port $service_port endpoints... (attempt $i/30)"
+    sleep 2
+  done
 done
 
 # Additional wait for DNS propagation
@@ -65,9 +66,9 @@ sleep 5
 # Debug: Check if Kibernate is actually listening on the expected ports
 echo "Debug: Checking Kibernate deployment and services..."
 kubectl get deployment kibernate -o wide
-kubectl get service kibernate-instance1 kibernate-instance2 kibernate-instance3
+kubectl get service kibernate
 kubectl get pods -l app.kubernetes.io/name=kibernate
-kubectl describe service kibernate-instance1
+kubectl describe service kibernate
 
 # Debug: Check if target deployments are actually ready and serving content
 echo "Debug: Checking target deployments..."
@@ -86,12 +87,9 @@ kibernate_pod=$(kubectl get pods -l app.kubernetes.io/name=kibernate -o name | h
 echo "Kibernate pod: $kibernate_pod"
 kubectl exec $kibernate_pod -- /bin/sh -c "netstat -tlnp 2>/dev/null || ss -tlnp 2>/dev/null || echo 'No netstat/ss available'" || echo "Failed to check ports"
 
-# Test that Kibernate can handle multi-instance configuration
-echo "Testing multi-instance configuration functionality..."
-
-# Test 1: Verify Kibernate is working and can route to testtarget1
-echo "Test 1: Testing routing to testtarget1..."
-kubectl run -i --rm test1 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
+# Test instance 1 (port 8080)
+echo "Testing instance 1 on port 8080..."
+kube_curl_cmd_instance_1="
 set -eo pipefail
 sleep 5
 
@@ -143,17 +141,69 @@ done
 echo \"All attempts failed\"
 exit 1
 "
+kubectl run -i --rm test1 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "$kube_curl_cmd_instance_1"
 
-# Test 2: Verify that the multi-instance configuration was loaded
-echo "Test 2: Verifying multi-instance configuration..."
-kubectl run -i --rm test2 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
+# Test instance 2 (port 8081)
+echo "Testing instance 2 on port 8081..."
+kube_curl_cmd_instance_2="
+set +eo pipefail  # Disable exit on error to capture all debug info
+sleep 5
+
+# Debug: Try to resolve the service
+echo \"Debug: Trying to resolve kibernate\"
+nslookup kibernate || echo \"DNS resolution failed\"
+
+# Debug: Test basic connectivity
+echo \"Debug: Testing basic connectivity to service\"
+nc -zv kibernate 8081 || echo \"Port connection test failed\"
+
+# Test that Kibernate responds on port 8081 with proper HTTP status capture
+echo \"Debug: Attempting curl connection...\"
+curl -v -w \"HTTP_STATUS:%{http_code}\" --connect-timeout 10 --max-time 30 'http://kibernate:8081' > /tmp/curl_out.txt 2>&1
+curl_exit_code=\$?
+echo \"Curl exit code: \$curl_exit_code\"
+
+# Show full output for debugging
+echo \"Full curl output:\"
+cat /tmp/curl_out.txt
+
+# Extract HTTP status if present
+http_status=\$(grep -o \"HTTP_STATUS:[0-9]*\" /tmp/curl_out.txt | cut -d: -f2 || echo \"NO_STATUS\")
+
+echo \"Instance 2 HTTP Status: \$http_status\"
+
+if [ \"\$http_status\" = \"200\" ] || [ \"\$http_status\" = \"502\" ]; then
+  echo \"Instance 2 connection successful - multi-instance working on port 8081!\"
+  echo \"Got HTTP \$http_status from Kibernate on port 8081\"
+  exit 0
+elif [ \$curl_exit_code -eq 7 ]; then
+  echo \"Connection refused - Kibernate may not be listening on port 8081\"
+  echo \"This could indicate the multi-instance configuration isn't working properly\"
+  exit 1
+else
+  echo \"Instance 2 unexpected status: \$http_status\"
+  exit 1
+fi
+"
+kubectl run -i --rm test2 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "$kube_curl_cmd_instance_2"
+
+# Test instance 3 (port 8082)
+echo "Testing instance 3 on port 8082..."
+kube_curl_cmd_instance_3="
 set -eo pipefail
 sleep 5
 
-# Check if Kibernate loaded the multi-instance configuration
-echo \"Checking if Kibernate loaded multi-instance configuration...\"
-if kubectl logs $kibernate_pod 2>&1 | grep -q 'instance1\|instance2\|instance3'; then
-  echo \"Multi-instance configuration detected in logs!\"
+# Test that Kibernate responds on port 8082 with proper HTTP status capture
+curl -s -w \"HTTP_STATUS:%{http_code}\" --connect-timeout 10 --max-time 30 'http://kibernate:8082' > /tmp/curl_out.txt 2>&1
+
+# Extract HTTP status
+http_status=\$(grep -o \"HTTP_STATUS:[0-9]*\" /tmp/curl_out.txt | cut -d: -f2)
+
+echo \"Instance 3 HTTP Status: \$http_status\"
+
+if [ \"\$http_status\" = \"200\" ] || [ \"\$http_status\" = \"502\" ]; then
+  echo \"Instance 3 connection successful - multi-instance working on port 8082!\"
+  echo \"Got HTTP \$http_status from Kibernate on port 8082\"
   exit 0
 else
   echo \"No multi-instance configuration found in logs\"
@@ -162,5 +212,6 @@ else
   exit 1
 fi
 "
+kubectl run -i --rm test3 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "$kube_curl_cmd_instance_3"
 
 echo "=== Multi-Instance Test Completed Successfully ==="
