@@ -66,7 +66,8 @@ echo "Testing instance 1 on port 8080..."
 kubectl run -i --rm test1 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
-for i in {1..5}; do
+i=1
+while [ \$i -le 5 ]; do
   echo \"Attempt \$i/5 to connect to kibernate-instance1:8080\"
   if curl -f --connect-timeout 10 --max-time 30 'http://kibernate-instance1:8080' 2>/dev/null | tee > /tmp/curl_out.txt; then
     echo
@@ -80,6 +81,7 @@ for i in {1..5}; do
     echo \"Attempt \$i failed, waiting before retry...\"
     sleep 5
   fi
+  i=\$((i+1))
 done
 echo \"All attempts for instance 1 failed\"
 exit 1
@@ -90,7 +92,8 @@ echo "Testing instance 2 on port 8081..."
 kubectl run -i --rm test2 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
-for i in {1..5}; do
+i=1
+while [ \$i -le 5 ]; do
   echo \"Attempt \$i/5 to connect to kibernate-instance2:8081\"
   if curl -f --connect-timeout 10 --max-time 30 'http://kibernate-instance2:8081' 2>/dev/null | tee > /tmp/curl_out.txt; then
     echo
@@ -104,6 +107,7 @@ for i in {1..5}; do
     echo \"Attempt \$i failed, waiting before retry...\"
     sleep 5
   fi
+  i=\$((i+1))
 done
 echo \"All attempts for instance 2 failed\"
 exit 1
@@ -114,7 +118,8 @@ echo "Testing instance 3 on port 8082..."
 kubectl run -i --rm test3 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
-for i in {1..5}; do
+i=1
+while [ \$i -le 5 ]; do
   echo \"Attempt \$i/5 to connect to kibernate-instance3:8082\"
   if curl -f --connect-timeout 10 --max-time 30 'http://kibernate-instance3:8082' 2>/dev/null | tee > /tmp/curl_out.txt; then
     echo
@@ -128,6 +133,7 @@ for i in {1..5}; do
     echo \"Attempt \$i failed, waiting before retry...\"
     sleep 5
   fi
+  i=\$((i+1))
 done
 echo \"All attempts for instance 3 failed\"
 exit 1

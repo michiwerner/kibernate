@@ -57,7 +57,8 @@ echo "Testing Kibernate with old config format..."
 kubectl run -i --rm test --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
-for i in {1..5}; do
+i=1
+while [ \$i -le 5 ]; do
   echo \"Attempt \$i/5 to connect to kibernate-test:8080\"
   if curl -f --connect-timeout 10 --max-time 30 'http://kibernate-test:8080' 2>/dev/null | tee > /tmp/curl_out.txt; then
     echo
@@ -71,6 +72,7 @@ for i in {1..5}; do
     echo \"Attempt \$i failed, waiting before retry...\"
     sleep 5
   fi
+  i=\$((i+1))
 done
 echo \"All attempts failed\"
 exit 1
