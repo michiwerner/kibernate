@@ -7,7 +7,8 @@ cd "$(dirname "$0")"/../../
 function finally() {
   set +eo pipefail
   kubectl delete deployment testtarget1 testtarget2 testtarget3 2>/dev/null || true
-  kubectl delete service kibernate-instance1 kibernate-instance2 kibernate-instance3 2>/dev/null || true
+  kubectl delete service testtarget1 testtarget2 testtarget3 2>/dev/null || true
+  kubectl delete service kibernate 2>/dev/null || true
 }
 trap finally EXIT
 
@@ -44,21 +45,17 @@ kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget3
 
 # Create services for each Kibernate instance port
 echo "Creating services for Kibernate instances..."
-# kubectl expose deployment kibernate --name=kibernate-instance1 --port=8080 --target-port=8080 || true
-# kubectl expose deployment kibernate --name=kibernate-instance2 --port=8081 --target-port=8081 || true
-# kubectl expose deployment kibernate --name=kibernate-instance3 --port=8082 --target-port=8082 || true
 
 # Wait for all services to be ready with endpoints
 echo "Waiting for service endpoints to be ready..."
-for service in kibernate-instance1 kibernate-instance2 kibernate-instance3; do
-  echo "Waiting for $service endpoints..."
+for service_port in "8080" "8081" "8082"; do
+  echo "Waiting for kibernate service on port $service_port endpoints..."
   for i in {1..30}; do
-    if kubectl get endpoints $service &> /dev/null && \
-       [ "$(kubectl get endpoints $service -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null)" ]; then
-      echo "$service endpoints are ready"
+    if kubectl get endpoints kibernate -o jsonpath="{.subsets[?(@.ports[0].port==$service_port)].addresses[*].ip}" &> /dev/null; then
+      echo "kibernate service on port $service_port endpoints are ready"
       break
     fi
-    echo "Waiting for $service endpoints... (attempt $i/30)"
+    echo "Waiting for kibernate service on port $service_port endpoints... (attempt $i/30)"
     sleep 2
   done
 done
@@ -69,9 +66,9 @@ sleep 5
 # Debug: Check if Kibernate is actually listening on the expected ports
 echo "Debug: Checking Kibernate deployment and services..."
 kubectl get deployment kibernate -o wide
-kubectl get service kibernate-instance1 kibernate-instance2 kibernate-instance3
+kubectl get service kibernate
 kubectl get pods -l app.kubernetes.io/name=kibernate
-kubectl describe service kibernate-instance1
+kubectl describe service kibernate
 
 # Debug: Check if target deployments are actually ready and serving content
 echo "Debug: Checking target deployments..."
