@@ -61,24 +61,45 @@ done
 # Additional wait for DNS propagation
 sleep 5
 
+# Debug: Check if Kibernate is actually listening on the expected ports
+echo "Debug: Checking Kibernate deployment and services..."
+kubectl get deployment kibernate -o wide
+kubectl get service kibernate-instance1 kibernate-instance2 kibernate-instance3
+kubectl get pods -l app=kibernate
+kubectl describe service kibernate-instance1
+
 # Test instance 1 (port 8080)
 echo "Testing instance 1 on port 8080..."
 kubectl run -i --rm test1 --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
+
+# Debug: Try to resolve the service first
+echo \"Debug: Trying to resolve kibernate-instance1\"
+nslookup kibernate-instance1 || echo \"DNS resolution failed\"
+
+# Debug: Try basic connectivity
+echo \"Debug: Testing basic connectivity to service\"
+nc -zv kibernate-instance1 8080 || echo \"Port connection test failed\"
+
 i=1
 while [ \$i -le 5 ]; do
   echo \"Attempt \$i/5 to connect to kibernate-instance1:8080\"
-  if curl -f --connect-timeout 10 --max-time 30 'http://kibernate-instance1:8080' 2>/dev/null | tee > /tmp/curl_out.txt; then
+  echo \"Debug: Trying curl with verbose output...\"
+  if curl -v --connect-timeout 10 --max-time 30 'http://kibernate-instance1:8080' 2>&1 | tee > /tmp/curl_out.txt; then
     echo
     if grep -q 'Thank you for using nginx.' /tmp/curl_out.txt; then
       echo \"Instance 1 test successful!\"
       exit 0
     else
       echo \"Response received but content doesn't match expected pattern\"
+      echo \"Full response:\"
+      cat /tmp/curl_out.txt
     fi
   else
-    echo \"Attempt \$i failed, waiting before retry...\"
+    echo \"Attempt \$i failed, curl output:\"
+    cat /tmp/curl_out.txt
+    echo \"Waiting before retry...\"
     sleep 5
   fi
   i=\$((i+1))
