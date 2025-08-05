@@ -43,19 +43,23 @@ kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget1
 kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget2
 kubectl wait --for=condition=ready --timeout=60s pod -l app=testtarget3
 
-# Wait for kibernate service to be ready
-echo "Waiting for kibernate service endpoints to be ready..."
-kubectl wait --for=condition=ready --timeout=60s endpoints/kibernate || {
-  echo "Kibernate endpoints not ready, checking what's wrong..."
-  kubectl get endpoints kibernate
-  kubectl get pods -l app.kubernetes.io/name=kibernate
-  kubectl describe service kibernate
-  echo "Kibernate pod logs:"
-  kubectl logs -l app.kubernetes.io/name=kibernate --tail=50
-  echo "Kibernate pod description:"
-  kubectl describe pod -l app.kubernetes.io/name=kibernate
-  exit 1
-}
+# Wait for kibernate pod to be ready
+echo "Waiting for kibernate pod to be ready..."
+kubectl wait --for=condition=ready --timeout=60s pod -l app.kubernetes.io/name=kibernate
+
+# Wait for endpoints to have addresses
+echo "Waiting for kibernate endpoints to be ready..."
+for i in {1..30}; do
+  if kubectl get endpoints kibernate -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null | grep -q .; then
+    echo "Kibernate endpoints are ready"
+    break
+  fi
+  echo "Waiting for endpoints... (attempt $i/30)"
+  sleep 2
+done
+
+# Give services a moment to stabilize
+sleep 5
 
 # Test instance 1 (port 8080)
 echo "Testing instance 1 on port 8080..."
