@@ -17,4 +17,15 @@ kubectl expose deployment testtarget --port=8080 --target-port=8080
 kubectl wait --for=condition=available --timeout=60s deployment/testtarget
 kubectl wait --for=condition=available --timeout=60s deployment/kibernate
 
-kubectl run -i --rm test --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "set -eo pipefail; sleep 10; curl 'http://kibernate:8080' | tee > /tmp/curl_out.txt; echo; cat /tmp/curl_out.txt | grep 'Thank you for using nginx.'"
+# Wait for the kibernate service to be created and endpoints to be ready
+until kubectl get service kibernate &> /dev/null; do
+  echo "Waiting for kibernate service to be created..."
+  sleep 2
+done
+until kubectl get endpoints kibernate &> /dev/null && [ "$(kubectl get endpoints kibernate -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null)" ]; do
+  echo "Waiting for kibernate service endpoints to be ready..."
+  sleep 2
+done
+sleep 5  # Additional wait for DNS propagation
+
+kubectl run -i --rm test --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "set -eo pipefail; sleep 10; curl 'http://kibernate.default.svc.cluster.local:8080' | tee > /tmp/curl_out.txt; echo; cat /tmp/curl_out.txt | grep 'Thank you for using nginx.'"
