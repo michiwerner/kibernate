@@ -102,30 +102,38 @@ nc -zv kibernate-instance1 8080 || echo \"Port connection test failed\"
 i=1
 while [ \$i -le 10 ]; do
   echo \"Attempt \$i/10 to connect to kibernate-instance1:8080\"
-  if curl -s --connect-timeout 10 --max-time 30 'http://kibernate-instance1:8080' 2>&1 | tee > /tmp/curl_out.txt; then
-    if grep -q 'Thank you for using nginx.' /tmp/curl_out.txt; then
+  
+  # Capture curl output and HTTP status separately
+  curl -s -w \"HTTP_STATUS:%{http_code}\" --connect-timeout 10 --max-time 30 'http://kibernate-instance1:8080' > /tmp/curl_out.txt 2>&1
+  
+  # Extract HTTP status
+  http_status=\$(grep -o \"HTTP_STATUS:[0-9]*\" /tmp/curl_out.txt | cut -d: -f2)
+  
+  # Remove status line from content
+  sed 's/HTTP_STATUS:[0-9]*$//' /tmp/curl_out.txt > /tmp/curl_content.txt
+  
+  echo \"HTTP Status: \$http_status\"
+  
+  if [ \"\$http_status\" = \"200\" ]; then
+    if grep -q 'Thank you for using nginx.' /tmp/curl_content.txt; then
       echo \"Instance 1 test successful - got nginx response!\"
       exit 0
-    elif grep -q 'HTTP/1.1 502' /tmp/curl_out.txt; then
-      echo \"Got 502 from Kibernate - service is running but target not ready yet\"
-      echo \"This is expected behavior for multi-instance test - Kibernate is working!\"
-      exit 0
     else
-      echo \"Response received but content doesn't match expected pattern\"
-      echo \"Full response:\"
-      cat /tmp/curl_out.txt
+      echo \"Got 200 but unexpected content:\"
+      cat /tmp/curl_content.txt
     fi
+  elif [ \"\$http_status\" = \"502\" ]; then
+    echo \"Got 502 from Kibernate - service is running but target not ready yet\"
+    echo \"This confirms multi-instance Kibernate is working on port 8080!\"
+    exit 0
   else
-    # Try with verbose output to see what's happening
-    curl -v --connect-timeout 10 --max-time 30 'http://kibernate-instance1:8080' 2>&1 | tee > /tmp/curl_debug.txt
-    if grep -q 'HTTP/1.1 502' /tmp/curl_debug.txt; then
-      echo \"Got 502 from Kibernate - service is running, target not ready\"
-      echo \"This confirms multi-instance Kibernate is working on port 8080!\"
-      exit 0
-    fi
-    echo \"Attempt \$i failed, waiting before retry...\"
-    sleep 10
+    echo \"Unexpected HTTP status: \$http_status\"
+    echo \"Response:\"
+    cat /tmp/curl_content.txt
   fi
+  
+  echo \"Waiting before retry...\"
+  sleep 10
   i=\$((i+1))
 done
 echo \"All attempts for instance 1 failed\"
