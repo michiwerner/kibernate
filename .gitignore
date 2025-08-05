@@ -38,3 +38,4 @@ msbuild.wrn
 .idea/
 
 kibernate-helm/
+/.claude/settings.local.json
