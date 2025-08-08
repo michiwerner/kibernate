@@ -104,10 +104,6 @@ public class KibernateEngine : IRunnable
                     _logger.LogInformation("Adding none waiter middleware");
                     _middlewares.Add(new Middlewares.NoneWaiterMiddleware(mw, _logger, _controller));
                     break;
-                case "uploadsavscanner":
-                    _logger.LogInformation("Adding uploads AV scanner middleware");
-                    _middlewares.Add(new Middlewares.UploadsAvScannerMiddleware(mw, _logger));
-                    break;
                 default:
                     throw new Exception($"Unsupported middleware type: {mw["type"]}");
             }
