@@ -17,14 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Yarp.ReverseProxy.Configuration;
-using Yarp.ReverseProxy.Forwarder;
-using Yarp.ReverseProxy.Transforms;
 using IMiddleware = Kibernate.Middlewares.IMiddleware;
 
 namespace Kibernate.Links;
@@ -37,54 +30,17 @@ public class HttpLink : ILink, IRunnable
     
     private ComponentConfig _config;
     
-    private WebApplication _app;
-    
     public HttpLink(ComponentConfig config, ILogger logger, IMiddleware middleware)
     {
         _config = config;
         _logger = logger;
-        var routes = new List<RouteConfig>
-        {
-            new RouteConfig {
-                RouteId = "catchall",
-                ClusterId = "upstream",
-                Match = new RouteMatch
-                {
-                    Path = "{**catch-all}"
-                }
-            }
-        };
-        var clusters = new List<ClusterConfig>
-        {
-            new ClusterConfig
-            {
-                ClusterId = "upstream",
-                Destinations = new Dictionary<string, DestinationConfig>
-                {
-                    { "default", new DestinationConfig() { Address = $"http://{_config["serviceName"]}:{_config["servicePort"]}" } },
-                },
-                HttpRequest = new ForwarderRequestConfig() { ActivityTimeout = TimeSpan.FromMinutes(10) }
-            }
-        };
-        var appBuilder = WebApplication.CreateBuilder();
-        appBuilder.Services.AddSingleton<ILogger>(_logger);
-        appBuilder.Services.AddSingleton<IMiddleware>(middleware);
-        appBuilder.Services.AddReverseProxy()
-            .LoadFromMemory(routes, clusters)
-            .AddTransforms(builderContext =>
-            {
-                if (_config.TryGetValue("passOriginalHostHeader", out var passOriginalHostHeader) && passOriginalHostHeader == "true")
-                {
-                    builderContext.AddOriginalHost();
-                }
-            });
-        _app = appBuilder.Build();
-        _app.UseMiddleware<IMiddleware>();
-        _app.MapReverseProxy();
+        var dest = $"http://{_config["serviceName"]}:{_config["servicePort"]}";
+        var passOriginal = _config.TryGetValue("passOriginalHostHeader", out var poh) && poh == "true";
+        SharedHttpHost.RegisterInstance(int.Parse(_config["listenPort"]), dest, passOriginal, middleware);
     }
     
     public async Task RunAsync()
     {
-        await _app.RunAsync($"http://*:{_config["listenPort"]}");
+        await SharedHttpHost.RunAsync();
     }
 }
