@@ -16,6 +16,7 @@
 
 using System;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Kibernate.Controllers;
 using Microsoft.Extensions.Logging;
@@ -28,14 +29,19 @@ public class ReadinessCheckExtension : IExtension
     
     private ILogger _logger;
 
-    private readonly HttpClient _client = new();
+    private static readonly SocketsHttpHandler _sharedHandler = new()
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 64
+    };
+    private static readonly HttpClient _client = new(_sharedHandler, disposeHandler: false);
     
     private readonly Uri _readinessCheckUri;
     
     public ReadinessCheckExtension(ComponentConfig config, ILogger logger)
     {
         _logger = logger;
-        _client.Timeout = TimeSpan.FromSeconds(5);
         _readinessCheckUri = new Uri(config["url"]);
     }
     
@@ -56,7 +62,8 @@ public class ReadinessCheckExtension : IExtension
         {
             try
             {
-                var response = await _client.GetAsync(_readinessCheckUri);
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = await _client.GetAsync(_readinessCheckUri, cts.Token);
                 if (response.IsSuccessStatusCode)
                 {
                     return;

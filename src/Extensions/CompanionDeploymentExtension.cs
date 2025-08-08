@@ -20,6 +20,7 @@ using k8s;
 using k8s.Models;
 using Kibernate.Controllers;
 using Microsoft.Extensions.Logging;
+using Kibernate.Clients;
 
 namespace Kibernate.Extensions;
 
@@ -41,7 +42,7 @@ public class CompanionDeploymentExtension : IExtension
     
     private TimeSpan? _delayStop;
     
-    private Kubernetes _client = new Kubernetes(KubernetesClientConfiguration.InClusterConfig());
+    private Kubernetes _client = KubernetesClientProvider.Instance;
     
     public CompanionDeploymentExtension(ComponentConfig config, ILogger logger)
     {

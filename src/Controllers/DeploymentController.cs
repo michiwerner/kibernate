@@ -20,6 +20,7 @@ using k8s;
 using k8s.Models;
 using Kibernate.Extensions;
 using Microsoft.Extensions.Logging;
+using Kibernate.Clients;
 
 namespace Kibernate.Controllers;
 
@@ -41,7 +42,7 @@ public class DeploymentController : IController, IRunnable
 
     private ComponentConfig _config;
 
-    private Kubernetes _client = new Kubernetes(KubernetesClientConfiguration.InClusterConfig());
+    private Kubernetes _client = KubernetesClientProvider.Instance;
 
     public DeploymentController(ComponentConfig config, ILogger logger, IExtension extensions)
     {
