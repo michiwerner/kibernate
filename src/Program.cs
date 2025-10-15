@@ -167,8 +167,7 @@ public class Program
                     string dest = $"http://{newInst.Link["serviceName"]}:{newInst.Link["servicePort"]}";
                     bool passOriginal = newInst.Link.TryGetValue("passOriginalHostHeader", out var poh) && poh == "true";
                     var hosts = ParseList(newInst.Link, "hosts", "host");
-                    var serverIps = ParseList(newInst.Link, "serverIps", "serverIp");
-                    var updated = Links.SharedHttpHost.TryUpdateRouting(name, dest, passOriginal, hosts, serverIps);
+                    var updated = Links.SharedHttpHost.TryUpdateRouting(name, dest, passOriginal, hosts);
                     if (updated)
                     {
                         logger.LogInformation("Applied dynamic routing update for instance {InstanceName}.", name);

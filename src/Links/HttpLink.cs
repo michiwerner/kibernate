@@ -57,8 +57,7 @@ public class HttpLink : ILink, IRunnable
         var passOriginal = _config.TryGetValue("passOriginalHostHeader", out var poh) && poh == "true";
         var listenPort = int.Parse(_config["listenPort"]);
         var hosts = ParseCsv(_config, "hosts", "host");
-        var serverIps = ParseCsv(_config, "serverIps", "serverIp");
-        SharedHttpHost.RegisterOrUpdateInstance(instanceName, listenPort, dest, passOriginal, hosts, serverIps, middleware);
+        SharedHttpHost.RegisterOrUpdateInstance(instanceName, listenPort, dest, passOriginal, hosts, middleware);
     }
     
     public async Task RunAsync()
