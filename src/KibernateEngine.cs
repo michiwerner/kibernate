@@ -112,7 +112,7 @@ public class KibernateEngine : IRunnable
         if (lnkConfig["type"].ToLower() == "http")
         {
             _logger.LogInformation("Using http link");
-            _link = new Links.HttpLink(lnkConfig, _logger, _middlewares);
+            _link = new Links.HttpLink(_config.Name, lnkConfig, _logger, _middlewares);
         }
         else
         {

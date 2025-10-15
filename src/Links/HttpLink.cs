@@ -29,14 +29,36 @@ public class HttpLink : ILink, IRunnable
     private ILogger _logger;
     
     private ComponentConfig _config;
+
+    private static List<string> ParseCsv(ComponentConfig cfg, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (cfg.TryGetValue(key, out var raw) && !string.IsNullOrWhiteSpace(raw))
+            {
+                var parts = raw.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var list = new List<string>();
+                foreach (var p in parts)
+                {
+                    var v = p.Trim();
+                    if (!string.IsNullOrWhiteSpace(v)) list.Add(v);
+                }
+                return list;
+            }
+        }
+        return new List<string>();
+    }
     
-    public HttpLink(ComponentConfig config, ILogger logger, IMiddleware middleware)
+    public HttpLink(string instanceName, ComponentConfig config, ILogger logger, IMiddleware middleware)
     {
         _config = config;
         _logger = logger;
         var dest = $"http://{_config["serviceName"]}:{_config["servicePort"]}";
         var passOriginal = _config.TryGetValue("passOriginalHostHeader", out var poh) && poh == "true";
-        SharedHttpHost.RegisterInstance(int.Parse(_config["listenPort"]), dest, passOriginal, middleware);
+        var listenPort = int.Parse(_config["listenPort"]);
+        var hosts = ParseCsv(_config, "hosts", "host");
+        var serverIps = ParseCsv(_config, "serverIps", "serverIp");
+        SharedHttpHost.RegisterOrUpdateInstance(instanceName, listenPort, dest, passOriginal, hosts, serverIps, middleware);
     }
     
     public async Task RunAsync()

@@ -34,14 +34,18 @@ internal static class SharedHttpHost
 {
     private class InstanceRegistration
     {
-        public required int ListenPort { get; init; }
-        public required string DestinationPrefix { get; init; }
-        public required bool PassOriginalHost { get; init; }
+        public required string Key { get; init; }
+        public required int ListenPort { get; set; }
+        public required string DestinationPrefix { get; set; }
+        public required bool PassOriginalHost { get; set; }
         public required IMiddleware Middleware { get; init; }
+        public List<string> Hosts { get; set; } = new();
+        public List<string> ServerIps { get; set; } = new();
     }
 
     private static readonly object _lock = new();
-    private static readonly List<InstanceRegistration> _instances = new();
+    private static readonly Dictionary<string, InstanceRegistration> _instancesByKey = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<int, List<InstanceRegistration>> _instancesByPort = new();
     private static readonly HashSet<int> _ports = new();
 
     private static WebApplicationBuilder? _builder;
@@ -74,12 +78,21 @@ internal static class SharedHttpHost
         }
     }
 
-    public static void RegisterInstance(int listenPort, string destinationPrefix, bool passOriginalHost, IMiddleware middleware)
+    public static IReadOnlyCollection<int> GetOpenPorts()
+    {
+        lock (_lock)
+        {
+            return _ports.ToArray();
+        }
+    }
+
+    public static void RegisterOrUpdateInstance(string key, int listenPort, string destinationPrefix, bool passOriginalHost, IEnumerable<string> hosts, IEnumerable<string> serverIps, IMiddleware middleware)
     {
         lock (_lock)
         {
             _builder ??= WebApplication.CreateBuilder();
             _builder.Services.AddHttpForwarder();
+
             if (_ports.Add(listenPort))
             {
                 _builder.WebHost.UseKestrel(options =>
@@ -87,13 +100,62 @@ internal static class SharedHttpHost
                     options.ListenAnyIP(listenPort);
                 });
             }
-            _instances.Add(new InstanceRegistration
+
+            if (!_instancesByKey.TryGetValue(key, out var reg))
             {
-                ListenPort = listenPort,
-                DestinationPrefix = destinationPrefix,
-                PassOriginalHost = passOriginalHost,
-                Middleware = middleware
-            });
+                reg = new InstanceRegistration
+                {
+                    Key = key,
+                    ListenPort = listenPort,
+                    DestinationPrefix = destinationPrefix,
+                    PassOriginalHost = passOriginalHost,
+                    Middleware = middleware,
+                    Hosts = hosts?.Select(h => h.Trim().ToLowerInvariant()).Where(h => !string.IsNullOrWhiteSpace(h)).Distinct().ToList() ?? new List<string>(),
+                    ServerIps = serverIps?.Select(ip => ip.Trim()).Where(ip => !string.IsNullOrWhiteSpace(ip)).Distinct().ToList() ?? new List<string>()
+                };
+                _instancesByKey[key] = reg;
+                if (!_instancesByPort.TryGetValue(listenPort, out var list))
+                {
+                    list = new List<InstanceRegistration>();
+                    _instancesByPort[listenPort] = list;
+                }
+                list.Add(reg);
+            }
+            else
+            {
+                // Update existing registration (only safe if port unchanged at runtime)
+                reg.DestinationPrefix = destinationPrefix;
+                reg.PassOriginalHost = passOriginalHost;
+                reg.Hosts = hosts?.Select(h => h.Trim().ToLowerInvariant()).Where(h => !string.IsNullOrWhiteSpace(h)).Distinct().ToList() ?? new List<string>();
+                reg.ServerIps = serverIps?.Select(ip => ip.Trim()).Where(ip => !string.IsNullOrWhiteSpace(ip)).Distinct().ToList() ?? new List<string>();
+            }
+        }
+    }
+
+    public static bool TryUpdateRouting(string key, string destinationPrefix, bool passOriginalHost, IEnumerable<string> hosts, IEnumerable<string> serverIps)
+    {
+        lock (_lock)
+        {
+            if (!_instancesByKey.TryGetValue(key, out var reg)) return false;
+            reg.DestinationPrefix = destinationPrefix;
+            reg.PassOriginalHost = passOriginalHost;
+            reg.Hosts = hosts?.Select(h => h.Trim().ToLowerInvariant()).Where(h => !string.IsNullOrWhiteSpace(h)).Distinct().ToList() ?? new List<string>();
+            reg.ServerIps = serverIps?.Select(ip => ip.Trim()).Where(ip => !string.IsNullOrWhiteSpace(ip)).Distinct().ToList() ?? new List<string>();
+            return true;
+        }
+    }
+
+    public static bool UnregisterInstance(string key)
+    {
+        lock (_lock)
+        {
+            if (!_instancesByKey.TryGetValue(key, out var reg)) return false;
+            _instancesByKey.Remove(key);
+            if (_instancesByPort.TryGetValue(reg.ListenPort, out var list))
+            {
+                list.RemoveAll(r => string.Equals(r.Key, key, StringComparison.OrdinalIgnoreCase));
+            }
+            return true;
         }
     }
 
@@ -115,22 +177,60 @@ internal static class SharedHttpHost
             _app = _builder.Build();
             var httpForwarder = _app.Services.GetRequiredService<Yarp.ReverseProxy.Forwarder.IHttpForwarder>();
 
-            foreach (var instance in _instances.OrderBy(i => i.ListenPort))
+            foreach (var port in _ports.OrderBy(p => p))
             {
-                var localPort = instance.ListenPort;
-                var destination = instance.DestinationPrefix;
-                var transformer = new HostHeaderTransformer(instance.PassOriginalHost);
-                var middleware = instance.Middleware;
-
-                _app.MapWhen(ctx => ctx.Connection.LocalPort == localPort, branch =>
+                var pLocal = port;
+                _app.MapWhen(ctx => ctx.Connection.LocalPort == pLocal, branch =>
                 {
-                    branch.Use(async (context, next) =>
-                    {
-                        await middleware.InvokeAsync(context, next);
-                    });
                     branch.Run(async context =>
                     {
-                        await httpForwarder.SendAsync(context, destination, _httpClient, _requestConfig, transformer);
+                        InstanceRegistration? selected = null;
+                        List<InstanceRegistration>? list;
+                        lock (_lock)
+                        {
+                            _instancesByPort.TryGetValue(pLocal, out list);
+                            if (list != null && list.Count > 0)
+                            {
+                                var hostHeader = context.Request.Headers.Host.ToString();
+                                var localIp = context.Connection.LocalIpAddress?.ToString();
+                                var lowerHost = hostHeader?.ToLowerInvariant();
+
+                                // 1) prefer host header match (works for both HTTP and HTTPS after TLS termination)
+                                if (!string.IsNullOrWhiteSpace(lowerHost))
+                                {
+                                    selected = list.FirstOrDefault(r => r.Hosts.Count > 0 && r.Hosts.Contains(lowerHost));
+                                }
+                                // 2) try local IP match
+                                if (selected == null && !string.IsNullOrWhiteSpace(localIp))
+                                {
+                                    selected = list.FirstOrDefault(r => r.ServerIps.Count > 0 && r.ServerIps.Contains(localIp));
+                                }
+                                // 4) fallback: if there is exactly one default (no filters) use it
+                                if (selected == null)
+                                {
+                                    var defaults = list.Where(r => (r.Hosts.Count == 0 && r.ServerIps.Count == 0)).ToList();
+                                    if (defaults.Count == 1)
+                                    {
+                                        selected = defaults[0];
+                                    }
+                                }
+                                // 5) else first as last resort
+                                selected ??= list[0];
+                            }
+                        }
+
+                        if (selected == null)
+                        {
+                            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                            await context.Response.WriteAsync("No route configured");
+                            return;
+                        }
+
+                        // Per-request middleware for selected instance
+                        await selected.Middleware.InvokeAsync(context, _ => Task.CompletedTask);
+
+                        var transformer = new HostHeaderTransformer(selected.PassOriginalHost);
+                        await httpForwarder.SendAsync(context, selected.DestinationPrefix, _httpClient, _requestConfig, transformer);
                     });
                 });
             }
