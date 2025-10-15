@@ -2,5 +2,6 @@
 
 set -eo pipefail
 
-minikube start --driver=docker --kubernetes-version=v1.33.3 -p kibernate-test
+# Start minikube for testing; use default supported Kubernetes version for stability
+minikube start --driver=docker -p kibernate-test
 minikube profile kibernate-test

@@ -6,8 +6,9 @@ cd "$(dirname "$0")"/..
 
 docker build -f package/docker/Dockerfile -t kibernate:latest .
 
-if [[ -n "$(command -v minikube)" ]] && minikube profile list | grep kibernate-test; then
-  echo "minikube profile kibernate-test exists - importing image into minikube"
-  docker save kibernate:latest | (eval "$(minikube docker-env -p kibernate-test)" && docker load)
+# If a minikube profile exists, load the image into the cluster so Helm can use imagePullPolicy=Never
+if [[ -n "$(command -v minikube)" ]] && minikube profile list | grep -q kibernate-test; then
+  echo "minikube profile kibernate-test exists - loading image into minikube"
+  minikube image load -p kibernate-test kibernate:latest
 fi
 
