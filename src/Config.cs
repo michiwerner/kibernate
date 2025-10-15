@@ -73,6 +73,62 @@ public class Config
         var config = deserializer.Deserialize<Config>(yamlContent);
         return config;
     }
+
+    // Parses a single-instance YAML into an InstanceConfig. Supports three formats:
+    // 1) Direct InstanceConfig YAML (link/middlewares/extensions/controller[, name])
+    // 2) Old single-instance YAML (version + link/middlewares/extensions/controller)
+    // 3) New multi-instance YAML (version + instances: [ ... ]) — uses the first instance
+    public static InstanceConfig? CreateInstanceFromYaml(string yamlContent, string defaultName)
+    {
+        var deserializer = new DeserializerBuilder().WithNamingConvention(UnderscoredNamingConvention.Instance).Build();
+
+        // Try multi-instance format first
+        if (yamlContent.Contains("instances:"))
+        {
+            try
+            {
+                var cfg = deserializer.Deserialize<Config>(yamlContent);
+                var first = cfg?.Instances?.Count > 0 ? cfg.Instances[0] : null;
+                if (first != null && string.IsNullOrWhiteSpace(first.Name)) first.Name = defaultName;
+                return first;
+            }
+            catch { /* fallthrough */ }
+        }
+
+        // Try direct InstanceConfig
+        try
+        {
+            var inst = deserializer.Deserialize<InstanceConfig>(yamlContent);
+            if (inst?.Link != null && inst.Controller != null)
+            {
+                if (string.IsNullOrWhiteSpace(inst.Name)) inst.Name = defaultName;
+                if (inst.Middlewares == null) inst.Middlewares = new List<ComponentConfig>();
+                if (inst.Extensions == null) inst.Extensions = new List<ComponentConfig>();
+                return inst;
+            }
+        }
+        catch { /* fallthrough */ }
+
+        // Try old single-instance format
+        try
+        {
+            var old = deserializer.Deserialize<OldConfig>(yamlContent);
+            if (old?.Link != null && old.Controller != null)
+            {
+                return new InstanceConfig
+                {
+                    Name = defaultName,
+                    Link = old.Link,
+                    Middlewares = old.Middlewares ?? new List<ComponentConfig>(),
+                    Extensions = old.Extensions ?? new List<ComponentConfig>(),
+                    Controller = old.Controller
+                };
+            }
+        }
+        catch { /* fallthrough */ }
+
+        return null;
+    }
 }
 
 // Keep the old config structure for backward compatibility
