@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 
 set -eo pipefail
 
@@ -137,3 +137,5 @@ echo "Testing instance 3 via Host header app3.local on port 8080..."
 curl_with_host app3.local
 
 echo "=== Multi-Instance Host Header Test Completed Successfully ==="
+
+exit 0

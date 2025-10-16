@@ -57,4 +57,4 @@ endif
 	./scripts/tests/06-test-multi-instance.sh
 
 07-test-multi-instance-host-header:
-	./scripts/tests/07-test-multi-instance-host-header.sh
+	bash ./scripts/tests/07-test-multi-instance-host-header.sh
