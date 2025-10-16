@@ -126,7 +126,8 @@ public class CompanionDeploymentExtension : IExtension
                 _currentGeneration = Guid.NewGuid();
                 var deploymentScale =
                     await _client.ReadNamespacedDeploymentScaleAsync(_config["deployment"], _config["namespace"]);
-                if ((deploymentScale.Spec.Replicas ?? 0) > 0)
+                var desiredReplicas = deploymentScale.Spec.Replicas ?? deploymentScale.Status.Replicas;
+                if (desiredReplicas > 0)
                 {
                     _logger.LogInformation("Deactivating companion deployment {deployment} in namespace {namespace}",
                         _config["deployment"], _config["namespace"]);
