@@ -6,13 +6,36 @@ set -eo pipefail
 cd "$(dirname "$0")"/../../
 
 function finally() {
+  exit_code=${1:-0}
   set +eo pipefail
+
+  if [ "$exit_code" != "0" ]; then
+    echo "==== DEBUG: Collecting pod logs because the script failed (exit code $exit_code) ===="
+    echo "-- kibernate pods --"
+    kubectl get pods -l app.kubernetes.io/name=kibernate -o wide || true
+    kubectl describe deployment kibernate || true
+    for p in $(kubectl get pods -l app.kubernetes.io/name=kibernate -o name 2>/dev/null); do
+      echo "--- logs for $p ---"
+      kubectl logs "$p" --tail=200 || true
+    done
+
+    echo "-- target pods --"
+    for sel in "app=testtarget1" "app=testtarget2" "app=testtarget3"; do
+      kubectl get pods -l "$sel" -o wide || true
+      for p in $(kubectl get pods -l "$sel" -o name 2>/dev/null); do
+        echo "--- logs for $p ---"
+        kubectl logs "$p" --tail=200 || true
+      done
+    done
+    echo "==== END DEBUG LOGS ===="
+  fi
+
   kubectl delete deployment testtarget1 testtarget2 testtarget3 2>/dev/null || true
   kubectl delete service testtarget1 testtarget2 testtarget3 2>/dev/null || true
   kubectl delete service kibernate 2>/dev/null || true
   kubectl delete service kibernate-test 2>/dev/null || true
 }
-trap finally EXIT
+trap 'finally $?' EXIT
 
 echo "=== Testing Multi-Instance Kibernate Configuration (Host Header Selection) ==="
 
