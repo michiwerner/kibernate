@@ -35,6 +35,7 @@ function finally() {
   kubectl delete service testtarget 2>/dev/null || true
   kubectl delete service testtarget-companion1 2>/dev/null || true
   kubectl delete service testtarget-companion2 2>/dev/null || true
+  exit "$exit_code"
 }
 trap 'finally $?' EXIT
 

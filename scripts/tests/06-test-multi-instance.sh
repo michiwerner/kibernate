@@ -5,12 +5,14 @@ set -eo pipefail
 cd "$(dirname "$0")"/../../
 
 function finally() {
+  exit_code=${1:-0}
   set +eo pipefail
   kubectl delete deployment testtarget1 testtarget2 testtarget3 2>/dev/null || true
   kubectl delete service testtarget1 testtarget2 testtarget3 2>/dev/null || true
   kubectl delete service kibernate 2>/dev/null || true
+  exit "$exit_code"
 }
-trap finally EXIT
+trap 'finally $?' EXIT
 
 echo "=== Testing Multi-Instance Kibernate Configuration ==="
 

@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-cd "$(dirname "$0")"/../../
+cd "$(dirname "$0")"/../../ || exit 1
 
 function finally() {
   exit_code=${1:-0}
@@ -13,7 +13,7 @@ function finally() {
     echo "-- kibernate pods --"
     kubectl get pods -l app.kubernetes.io/name=kibernate -o wide || true
     kubectl describe deployment kibernate || true
-    for p in $(kubectl get pods -l app.kubernetes.io/name=kibernate -o name 2>/dev/null); do
+    kubectl get pods -l app.kubernetes.io/name=kibernate -o name 2>/dev/null | while IFS= read -r p; do
       echo "--- logs for $p ---"
       kubectl logs "$p" --tail=200 || true
     done
@@ -21,7 +21,7 @@ function finally() {
     echo "-- target pods --"
     for sel in "app=testtarget1" "app=testtarget2" "app=testtarget3"; do
       kubectl get pods -l "$sel" -o wide || true
-      for p in $(kubectl get pods -l "$sel" -o name 2>/dev/null); do
+      kubectl get pods -l "$sel" -o name 2>/dev/null | while IFS= read -r p; do
         echo "--- logs for $p ---"
         kubectl logs "$p" --tail=200 || true
       done
@@ -33,6 +33,7 @@ function finally() {
   kubectl delete service testtarget1 testtarget2 testtarget3 2>/dev/null || true
   kubectl delete service kibernate 2>/dev/null || true
   kubectl delete service kibernate-test 2>/dev/null || true
+  exit "$exit_code"
 }
 trap 'finally $?' EXIT
 
@@ -98,13 +99,13 @@ sleep 5
 # Helper to run a curl with a specific Host header and retry
 function curl_with_host() {
   local host="$1"
-  kubectl run -i --rm curl-$(echo "$host" | tr '.' '-') --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
+  kubectl run -i --rm "curl-$(echo "$host" | tr '.' '-')" --image=curlimages/curl:8.1.1 --restart=Never -- /bin/sh -c "
 set -eo pipefail
 sleep 5
 i=1
-while [ $i -le 5 ]; do
-  echo \"Attempt $i/5 to connect to kibernate-test:8080 with Host: ${host}\"
-  if curl -f --connect-timeout 10 --max-time 30 -H \"Host: ${host}\" 'http://kibernate-test:8080' 2>/dev/null | tee > /tmp/curl_out.txt; then
+while [ \$i -le 5 ]; do
+  echo \"Attempt \$i/5 to connect to kibernate-test:8080 with Host: ${host}\"
+  if curl -f --connect-timeout 10 --max-time 30 -H \"Host: ${host}\" 'http://kibernate-test:8080' 2>/dev/null | tee /tmp/curl_out.txt; then
     echo
     if grep -q 'Thank you for using nginx.' /tmp/curl_out.txt; then
       echo \"Test successful!\"
@@ -113,10 +114,10 @@ while [ $i -le 5 ]; do
       echo \"Response received but content doesn't match expected pattern\"
     fi
   else
-    echo \"Attempt $i failed, waiting before retry...\"
+    echo \"Attempt \$i failed, waiting before retry...\"
     sleep 5
   fi
-  i=$((i+1))
+  i=\$((i+1))
 done
 echo \"All attempts failed\"
 exit 1

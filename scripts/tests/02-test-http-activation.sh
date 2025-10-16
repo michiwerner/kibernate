@@ -5,12 +5,14 @@ set -eo pipefail
 cd "$(dirname "$0")"/../../
 
 function finally() {
+  exit_code=${1:-0}
   set +eo pipefail
-  kubectl delete pod test > /dev/null 2>&1 # this will fail under normal circumstances, thus all outputs are hidden
-  kubectl delete deployment testtarget
-  kubectl delete service testtarget
+  kubectl delete pod test > /dev/null 2>&1 || true # this will fail under normal circumstances, thus all outputs are hidden
+  kubectl delete deployment testtarget 2>/dev/null || true
+  kubectl delete service testtarget 2>/dev/null || true
+  exit "$exit_code"
 }
-trap finally EXIT
+trap 'finally $?' EXIT
 
 kubectl create deployment testtarget --image=nginxinc/nginx-unprivileged:latest --replicas=0 --port=8080
 kubectl expose deployment testtarget --port=8080 --target-port=8080
