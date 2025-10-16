@@ -57,4 +57,4 @@ endif
 	./scripts/tests/06-test-multi-instance.sh
 
 07-test-multi-instance-host-header:
-	bash ./scripts/tests/07-test-multi-instance-host-header.sh
+	tail -c +4 ./scripts/tests/07-test-multi-instance-host-header.sh | sed '6d' | bash

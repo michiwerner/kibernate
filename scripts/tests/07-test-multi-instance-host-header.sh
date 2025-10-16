@@ -103,8 +103,8 @@ function curl_with_host() {
 set -eo pipefail
 sleep 5
 i=1
-while [ \$i -le 5 ]; do
-  echo \"Attempt \$i/5 to connect to kibernate-test:8080 with Host: ${host}\"
+while [ $i -le 5 ]; do
+  echo \"Attempt $i/5 to connect to kibernate-test:8080 with Host: ${host}\"
   if curl -f --connect-timeout 10 --max-time 30 -H \"Host: ${host}\" 'http://kibernate-test:8080' 2>/dev/null | tee > /tmp/curl_out.txt; then
     echo
     if grep -q 'Thank you for using nginx.' /tmp/curl_out.txt; then
@@ -114,10 +114,10 @@ while [ \$i -le 5 ]; do
       echo \"Response received but content doesn't match expected pattern\"
     fi
   else
-    echo \"Attempt \$i failed, waiting before retry...\"
+    echo \"Attempt $i failed, waiting before retry...\"
     sleep 5
   fi
-  i=\$((i+1))
+  i=$((i+1))
 done
 echo \"All attempts failed\"
 exit 1
