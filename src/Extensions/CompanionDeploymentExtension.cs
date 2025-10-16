@@ -164,6 +164,35 @@ public class CompanionDeploymentExtension : IExtension
 
                 break;
             }
+            case ControllerEventType.StatusChangeRequested:
+            {
+                if (context.TryGetValue("newStatus", out var newStatus) &&
+                    (newStatus == ControllerStatus.Deactivating || newStatus == ControllerStatus.Deactivated))
+                {
+                    try
+                    {
+                        var deploymentScale2 = await _client.ReadNamespacedDeploymentScaleAsync(_config["deployment"], _config["namespace"]);
+                        if ((deploymentScale2.Spec.Replicas ?? 0) != 0)
+                        {
+                            _logger.LogInformation("Ensuring companion deployment {deployment} is scaled down due to status change to {status}", _config["deployment"], newStatus);
+                            var deploymentScalePatch2 = @"
+                            [
+                             { 
+                              ""path"": ""/spec/replicas"", 
+                              ""op"": ""replace"", 
+                              ""value"": 0 
+                             } 
+                            ]";
+                            await _client.PatchNamespacedDeploymentScaleAsync(new V1Patch(deploymentScalePatch2, V1Patch.PatchType.JsonPatch), _config["deployment"], _config["namespace"]);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to scale down companion deployment {deployment} on status change", _config["deployment"]);
+                    }
+                }
+                break;
+            }
         }
 
         await next(context);
