@@ -46,101 +46,30 @@ public class Config
     {
         var deserializer = new DeserializerBuilder().WithNamingConvention(UnderscoredNamingConvention.Instance).Build();
         var yamlContent = File.ReadAllText(path);
-        
-        // Check if the config is in the old format (single instance)
-        if (yamlContent.Contains("link:") && !yamlContent.Contains("instances:"))
-        {
-            // Parse as old format and convert to new format
-            var oldConfig = deserializer.Deserialize<OldConfig>(yamlContent);
-            return new Config
-            {
-                Version = oldConfig.Version,
-                Instances = new List<InstanceConfig>
-                {
-                    new InstanceConfig
-                    {
-                        Name = "default",
-                        Link = oldConfig.Link,
-                        Middlewares = oldConfig.Middlewares,
-                        Extensions = oldConfig.Extensions,
-                        Controller = oldConfig.Controller
-                    }
-                }
-            };
-        }
-        
-        // Parse as new format
         var config = deserializer.Deserialize<Config>(yamlContent);
         return config;
     }
 
-    // Parses a single-instance YAML into an InstanceConfig. Supports three formats:
-    // 1) Direct InstanceConfig YAML (link/middlewares/extensions/controller[, name])
-    // 2) Old single-instance YAML (version + link/middlewares/extensions/controller)
-    // 3) New multi-instance YAML (version + instances: [ ... ]) — uses the first instance
+    // Parses YAML in multi-instance format and returns the first instance.
     public static InstanceConfig? CreateInstanceFromYaml(string yamlContent, string defaultName)
     {
         var deserializer = new DeserializerBuilder().WithNamingConvention(UnderscoredNamingConvention.Instance).Build();
-
-        // Try multi-instance format first
-        if (yamlContent.Contains("instances:"))
-        {
-            try
-            {
-                var cfg = deserializer.Deserialize<Config>(yamlContent);
-                var first = cfg?.Instances?.Count > 0 ? cfg.Instances[0] : null;
-                if (first != null && string.IsNullOrWhiteSpace(first.Name)) first.Name = defaultName;
-                return first;
-            }
-            catch { /* fallthrough */ }
-        }
-
-        // Try direct InstanceConfig
         try
         {
-            var inst = deserializer.Deserialize<InstanceConfig>(yamlContent);
-            if (inst?.Link != null && inst.Controller != null)
+            var cfg = deserializer.Deserialize<Config>(yamlContent);
+            var first = cfg?.Instances?.Count > 0 ? cfg.Instances[0] : null;
+            if (first != null)
             {
-                if (string.IsNullOrWhiteSpace(inst.Name)) inst.Name = defaultName;
-                if (inst.Middlewares == null) inst.Middlewares = new List<ComponentConfig>();
-                if (inst.Extensions == null) inst.Extensions = new List<ComponentConfig>();
-                return inst;
+                if (string.IsNullOrWhiteSpace(first.Name)) first.Name = defaultName;
+                first.Middlewares ??= new List<ComponentConfig>();
+                first.Extensions ??= new List<ComponentConfig>();
             }
+            return first;
         }
-        catch { /* fallthrough */ }
-
-        // Try old single-instance format
-        try
+        catch
         {
-            var old = deserializer.Deserialize<OldConfig>(yamlContent);
-            if (old?.Link != null && old.Controller != null)
-            {
-                return new InstanceConfig
-                {
-                    Name = defaultName,
-                    Link = old.Link,
-                    Middlewares = old.Middlewares ?? new List<ComponentConfig>(),
-                    Extensions = old.Extensions ?? new List<ComponentConfig>(),
-                    Controller = old.Controller
-                };
-            }
+            return null;
         }
-        catch { /* fallthrough */ }
-
-        return null;
     }
 }
 
-// Keep the old config structure for backward compatibility
-internal class OldConfig
-{
-    public string Version { get; set; }
-
-    public ComponentConfig Link { get; set; }
-
-    public List<ComponentConfig> Middlewares { get; set; }
-    
-    public List<ComponentConfig> Extensions { get; set; }
-
-    public ComponentConfig Controller { get; set; }
-}
