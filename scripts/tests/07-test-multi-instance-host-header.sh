@@ -1,4 +1,5 @@
 ﻿#!/usr/bin/env bash
+# Ensure clean shebang (no BOM)
 
 set -eo pipefail
 

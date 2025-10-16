@@ -189,6 +189,12 @@ internal static class SharedHttpHost
                             {
                                 var hostHeader = context.Request.Headers.Host.ToString();
                                 var lowerHost = hostHeader?.ToLowerInvariant();
+                                if (!string.IsNullOrWhiteSpace(lowerHost))
+                                {
+                                    var idx = lowerHost.IndexOf(':');
+                                    if (idx > 0) lowerHost = lowerHost.Substring(0, idx);
+                                    lowerHost = lowerHost.Trim().TrimEnd('.');
+                                }
 
                                 // 1) prefer host header match (works for both HTTP and HTTPS after TLS termination)
                                 if (!string.IsNullOrWhiteSpace(lowerHost))
